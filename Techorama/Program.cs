@@ -63,16 +63,7 @@ class MyContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        foreach (var entity in modelBuilder.Model.GetEntityTypes())
-        {
-            foreach (var prop in entity.GetProperties())
-            {
-                if (prop.ClrType == typeof(string))
-                {
-                    prop.SetMaxLength(50);
-                }
-            }
-        }
+        
 
         //modelBuilder.Entity<Dog>(b =>
         //{
@@ -116,7 +107,19 @@ class DogConfiguration : IEntityTypeConfiguration<Dog>
     }
 }
 
-class StringConvention : IConvention
+class StringConvention : IModelFinalizingConvention
 {
-
+    public void ProcessModelFinalizing(IConventionModelBuilder modelBuilder, IConventionContext<IConventionModelBuilder> context)
+    {
+        foreach (var entity in modelBuilder.Metadata.GetEntityTypes())
+        {
+            foreach (var prop in entity.GetProperties())
+            {
+                if (prop.ClrType == typeof(string))
+                {
+                    prop.SetMaxLength(50);
+                }
+            }
+        }
+    }
 }
