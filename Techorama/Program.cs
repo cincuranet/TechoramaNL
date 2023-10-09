@@ -1,8 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
 using System.Security.Cryptography.X509Certificates;
+using Azure.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -16,8 +19,8 @@ internal class Program
     {
         using (var context = new MyContext())
         {
-            context.Database.EnsureDeleted();
-            context.Database.EnsureCreated();
+            //context.Database.EnsureDeleted();
+            //context.Database.EnsureCreated();
 
             //context.Dogs.ToList();
             ////context.Set<DogOwner>().select
@@ -33,18 +36,40 @@ internal class Program
             //context.Dogs
             //    .ToList();
             //context.Owners.Where(x => x.ShippingAddress.Street == "vndsfjkvlf").ToList();
-            context.Owners.Add(new Owner()
+            //context.Owners.Add(new Owner()
+            //{
+            //    FirstName = "T",
+            //    LastName = "T",
+            //    ShippingAddress = new Address(),
+            //    Duration = new Duration(10),
+            //});
+            //context.SaveChanges();
+            //var owner = context.Owners/*.Where(x => x.Duration == new Duration(11))*/
+            //    .TagWithCallSite()
+            //    .First();
+            //owner.Duration = new Duration(10);
+            ////owner.FirstName = "T";
+            //context.SaveChanges();
+
+            //context.Dogs
+            //    .Where(x => context.FooBar(x.Id).Any() && EF.Functions.Like(x.Name, "A%Foo"))
+            //    /*.FromSql($"select Name, 1 as Count from T_Dogs where 1=1")*/
+            //    //.OrderBy(x => x.Id)
+            //    .ToList();
+
+            //var dogs = context.Dogs
+            //    //.Include(x => x.Owner)
+            //    .Where(x => !EF.Functions.Like(x.Name, "A%Foo"))
+            //    .ToList();
+            var dogs = context.Dogs
+                //.Include(x => x.Owner)
+                .Where(x => !EF.Functions.Like(x.Name, "A%Foo"))
+                .ToList();
+            foreach (var dog in dogs)
             {
-                FirstName = "T",
-                LastName = "T",
-                ShippingAddress = new Address(),
-                Duration = new Duration(10),
-            });
-            context.SaveChanges();
-            var owner = context.Owners/*.Where(x => x.Duration == new Duration(11))*/.First();
-            owner.Duration = new Duration(10);
-            //owner.FirstName = "T";
-            context.SaveChanges();
+                //context.Entry(dog).Reference(x => x.Owner).Load();
+                Console.WriteLine(dog.Owner.LastName);
+            }
         }
     }
 }
@@ -54,11 +79,14 @@ public class Dog
     public int Id { get; set; }
     [Required]
     public string Name { get; set; }
-    public Owner Owner { get; set; }
+    public virtual Owner Owner { get; set; }
     //public int? OwnerId { get; set; }
     //public ICollection<Owner> Owners { get; set; }
     //public DateOnly OwnerAssigned { get; set; }
     public bool Deleted { get; set; }
+
+    public Dog()
+    { }
 }
 public class Owner
 {
@@ -78,7 +106,7 @@ public class Owner
             static void Validate(string value) { }
         }
     }
-    public ICollection<Dog> Dogs { get; set; }
+    public virtual ICollection<Dog> Dogs { get; set; }
     public Address InvoiceAddress { get; set; }
     public Address ShippingAddress { get; set; }
     public Duration Duration { get; set; }
@@ -120,8 +148,17 @@ public class Address
 //    public int OwnerId { get; set; }
 //    public DateOnly Assigned { get; set; }
 //}
+//class FooBar
+//{
+//    public string Name { get; set; }
+//    public int Count { get; set; }
+//}
 class MyContext : DbContext
 {
+    [DbFunction]
+    public IQueryable<Dog> FooBar(int id) =>
+        FromExpression(() => FooBar(id));
+
     public DbSet<Dog> Dogs => Set<Dog>();
     public DbSet<Owner> Owners => Set<Owner>();
 
@@ -133,6 +170,7 @@ class MyContext : DbContext
             optionsBuilder.UseSqlServer(@"Data Source=.\;Initial Catalog=techorama;Integrated Security=SSPI;ConnectRetryCount=0;Trust Server Certificate=True;");
             optionsBuilder.LogTo(Console.WriteLine);
             optionsBuilder.EnableSensitiveDataLogging();
+            //optionsBuilder.UseLazyLoadingProxies();
         }
     }
 
@@ -163,6 +201,9 @@ class MyContext : DbContext
             builder.Property<int>("Id");
             builder.Property<string>("Name");
             builder.Property<DateTimeOffset>("DOB");
+            //builder.HasOne<Owner>("Owner")
+            //.WithMany("Cats")
+            //.HasForeignKey()
         });
         //modelBuilder.Entity<Cat>(builder =>
         //{
@@ -172,6 +213,12 @@ class MyContext : DbContext
         //    builder.Property<string>("Name");
         //    builder.Property<DateOnly>("DOB");
         //});
+
+        //modelBuilder.Entity<FooBar>()
+        //    .ToView("MyView")
+        //    .HasNoKey();
+
+        //modelBuilder.HasDbFunction()
 
         modelBuilder.ApplyConfiguration(new DogConfiguration());
     }
