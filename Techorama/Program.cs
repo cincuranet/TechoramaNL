@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.Extensions.Options;
 
 namespace Techorama;
 
@@ -14,8 +15,16 @@ internal class Program
             context.Database.EnsureDeleted();
             context.Database.EnsureCreated();
 
-            context.Dogs.ToList();
-            //context.Set<DogOwner>().select
+            //context.Dogs.ToList();
+            ////context.Set<DogOwner>().select
+            //context.Add(new Owner() { FirstName = "T", LastName = "T", SSN = "T" });
+            //context.SaveChanges();
+            //context.ChangeTracker.Clear();
+            //context.Owners.ToList();
+
+            var ssn = "";
+            var data = context.Owners.Where(x => EF.Property<string>(x, "SSN") == ssn).ToList();
+            context.Entry(data[0]).Property<string>("SSN").CurrentValue = ssn;
         }
     }
 }
@@ -32,9 +41,22 @@ public class Dog
 }
 public class Owner
 {
+    private string _ssn;
+
     public int Id { get; set; }
     public string FirstName { get; set; }
     public string LastName { get; set; }
+    public string SSN
+    {
+        get => _ssn;
+        set
+        {
+            Validate(value);
+            _ssn = value;
+
+            static void Validate(string value) { }
+        }
+    }
     public ICollection<Dog> Dogs { get; set; }
 }
 //public class DogOwner
@@ -46,7 +68,7 @@ public class Owner
 class MyContext : DbContext
 {
     public DbSet<Dog> Dogs => Set<Dog>();
-    //public DbSet<Owner> Owners => Set<Owner>();
+    public DbSet<Owner> Owners => Set<Owner>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -63,17 +85,30 @@ class MyContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        
-
-        //modelBuilder.Entity<Dog>(b =>
-        //{
-        //});
-
         modelBuilder.Entity<Owner>(builder =>
         {
             builder.Property(x => x.Id)
                 .UseHiLo();
+            builder.Property<string>("SSN")
+                .UsePropertyAccessMode(PropertyAccessMode.FieldDuringConstruction)
+                .HasField("_ssn");
         });
+
+        modelBuilder.SharedTypeEntity<Dictionary<string, object>>("Cat", builder =>
+        {
+            builder.ToTable("Cats");
+            builder.Property<int>("Id");
+            builder.Property<string>("Name");
+            builder.Property<DateTimeOffset>("DOB");
+        });
+        //modelBuilder.Entity<Cat>(builder =>
+        //{
+        //    builder.ToTable("Cats");
+        //    builder.IndexerProperty()
+        //    builder.Property<int>("Id");
+        //    builder.Property<string>("Name");
+        //    builder.Property<DateOnly>("DOB");
+        //});
 
         modelBuilder.ApplyConfiguration(new DogConfiguration());
     }
