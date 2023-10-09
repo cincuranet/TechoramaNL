@@ -19,8 +19,8 @@ internal class Program
     {
         using (var context = new MyContext())
         {
-            //context.Database.EnsureDeleted();
-            //context.Database.EnsureCreated();
+            context.Database.EnsureDeleted();
+            context.Database.EnsureCreated();
 
             //context.Dogs.ToList();
             ////context.Set<DogOwner>().select
@@ -61,15 +61,24 @@ internal class Program
             //    //.Include(x => x.Owner)
             //    .Where(x => !EF.Functions.Like(x.Name, "A%Foo"))
             //    .ToList();
-            var dogs = context.Dogs
-                //.Include(x => x.Owner)
-                .Where(x => !EF.Functions.Like(x.Name, "A%Foo"))
+            //var dogs = context.Dogs
+            //    .AsSplitQuery()
+            //    .Select(x => new
+            //    {
+            //        DogName = x.Name,
+            //        OwnerName = x.Owner.FirstName + " " + x.Owner.LastName,
+            //    })
+            //    .ToList();
+            //foreach (var dog in dogs)
+            //{
+            //    //context.Entry(dog).Reference(x => x.Owner).Load();
+            //    Console.WriteLine(dog.OwnerName);
+            //}
+            //context.Set<Vehicle>().ToList();
+            //context.Set<Car>().ToList();
+            context.Dogs.TemporalAsOf(DateTime.UtcNow) /*TemporalFromTo(DateTime.UtcNow.AddDays(-3), DateTime.UtcNow)*/
+                .Where(x => x.Name.Contains("A"))
                 .ToList();
-            foreach (var dog in dogs)
-            {
-                //context.Entry(dog).Reference(x => x.Owner).Load();
-                Console.WriteLine(dog.Owner.LastName);
-            }
         }
     }
 }
@@ -153,6 +162,21 @@ public class Address
 //    public string Name { get; set; }
 //    public int Count { get; set; }
 //}
+public abstract class Vehicle
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public float Speed { get; set; }
+}
+public class Car : Vehicle
+{
+    public int EngineSize { get; set; }
+}
+public class Plane : Vehicle
+{
+    public int MTOW { get; set; }
+    public int NumberOfPassengers { get; set; }
+}
 class MyContext : DbContext
 {
     [DbFunction]
@@ -167,7 +191,8 @@ class MyContext : DbContext
         base.OnConfiguring(optionsBuilder);
         if (!optionsBuilder.IsConfigured)
         {
-            optionsBuilder.UseSqlServer(@"Data Source=.\;Initial Catalog=techorama;Integrated Security=SSPI;ConnectRetryCount=0;Trust Server Certificate=True;");
+            optionsBuilder.UseSqlServer(@"Data Source=.\;Initial Catalog=techorama;Integrated Security=SSPI;ConnectRetryCount=0;Trust Server Certificate=True;",
+                options => options.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery));
             optionsBuilder.LogTo(Console.WriteLine);
             optionsBuilder.EnableSensitiveDataLogging();
             //optionsBuilder.UseLazyLoadingProxies();
@@ -178,6 +203,7 @@ class MyContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        #region -
         modelBuilder.Entity<Owner>(builder =>
         {
             builder.Property(x => x.Id)
@@ -219,6 +245,49 @@ class MyContext : DbContext
         //    .HasNoKey();
 
         //modelBuilder.HasDbFunction()
+        #endregion
+
+        //modelBuilder
+        //    .Entity<Vehicle>(builder =>
+        //    {
+        //        builder.UseTphMappingStrategy();
+        //        builder.ToTable("TPH_Vehicles");
+        //    })
+        //    .Entity<Car>(builder =>
+        //    {
+        //        builder.HasDiscriminator<string>("D").HasValue("CA");
+        //    })
+        //    .Entity<Plane>(builder =>
+        //    {
+        //        builder.HasDiscriminator<string>("D").HasValue("PL");
+        //    });
+        //modelBuilder
+        //    .Entity<Vehicle>(builder =>
+        //    {
+        //        builder.UseTptMappingStrategy();
+        //        builder.ToTable("TPT_Vehicles");
+        //    })
+        //    .Entity<Car>(builder =>
+        //    {
+        //        builder.ToTable("TPT_Cars");
+        //    })
+        //    .Entity<Plane>(builder =>
+        //    {
+        //        builder.ToTable("TPT_Planes");
+        //    });
+        //modelBuilder
+        //    .Entity<Vehicle>(builder =>
+        //    {
+        //        builder.UseTpcMappingStrategy();
+        //    })
+        //    .Entity<Car>(builder =>
+        //    {
+        //        builder.ToTable("TPC_Cars");
+        //    })
+        //    .Entity<Plane>(builder =>
+        //    {
+        //        builder.ToTable("TPC_Planes");
+        //    });
 
         modelBuilder.ApplyConfiguration(new DogConfiguration());
     }
@@ -235,7 +304,7 @@ class DogConfiguration : IEntityTypeConfiguration<Dog>
 {
     public void Configure(EntityTypeBuilder<Dog> builder)
     {
-        builder.ToTable("T_Dogs");
+        builder.ToTable("T_Dogs", b => b.IsTemporal());
         builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => x.Id);
         builder.Property(x => x.Id)
