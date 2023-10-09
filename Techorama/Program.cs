@@ -1,7 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Linq.Expressions;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Options;
 
 namespace Techorama;
@@ -22,9 +26,25 @@ internal class Program
             //context.ChangeTracker.Clear();
             //context.Owners.ToList();
 
-            var ssn = "";
-            var data = context.Owners.Where(x => EF.Property<string>(x, "SSN") == ssn).ToList();
-            context.Entry(data[0]).Property<string>("SSN").CurrentValue = ssn;
+            //var ssn = "";
+            //var data = context.Owners.Where(x => EF.Property<string>(x, "SSN") == ssn).ToList();
+            //context.Entry(data[0]).Property<string>("SSN").CurrentValue = ssn;
+
+            //context.Dogs
+            //    .ToList();
+            //context.Owners.Where(x => x.ShippingAddress.Street == "vndsfjkvlf").ToList();
+            context.Owners.Add(new Owner()
+            {
+                FirstName = "T",
+                LastName = "T",
+                ShippingAddress = new Address(),
+                Duration = new Duration(10),
+            });
+            context.SaveChanges();
+            var owner = context.Owners/*.Where(x => x.Duration == new Duration(11))*/.First();
+            owner.Duration = new Duration(10);
+            //owner.FirstName = "T";
+            context.SaveChanges();
         }
     }
 }
@@ -38,6 +58,7 @@ public class Dog
     //public int? OwnerId { get; set; }
     //public ICollection<Owner> Owners { get; set; }
     //public DateOnly OwnerAssigned { get; set; }
+    public bool Deleted { get; set; }
 }
 public class Owner
 {
@@ -58,6 +79,40 @@ public class Owner
         }
     }
     public ICollection<Dog> Dogs { get; set; }
+    public Address InvoiceAddress { get; set; }
+    public Address ShippingAddress { get; set; }
+    public Duration Duration { get; set; }
+}
+public class Duration
+{
+    int _seconds;
+
+    public Duration(int seconds)
+    {
+        _seconds = seconds;
+    }
+
+    public int Seconds => _seconds;
+    public TimeSpan TimeSpan => TimeSpan.FromSeconds(_seconds);
+}
+public class DurationConverter : ValueConverter<Duration, int>
+{
+    public DurationConverter()
+        : base(d => d.Seconds * 1000, x => new Duration(x / 1000), null)
+    { }
+}
+public class DurationComparer : ValueComparer<Duration>
+{
+    public DurationComparer()
+        : base((lhs, rhs) => lhs.Seconds == rhs.Seconds, x => x.Seconds.GetHashCode())
+    { }
+}
+public class Address
+{
+    public string Street { get; set; }
+    public string City { get; set; }
+    public string State { get; set; }
+    public string PostalCode { get; set; }
 }
 //public class DogOwner
 //{
@@ -92,6 +147,14 @@ class MyContext : DbContext
             builder.Property<string>("SSN")
                 .UsePropertyAccessMode(PropertyAccessMode.FieldDuringConstruction)
                 .HasField("_ssn");
+
+            //builder.OwnsOne(x => x.InvoiceAddress);
+            //builder.OwnsOne(x => x.ShippingAddress);
+            builder.OwnsOne(x => x.InvoiceAddress).ToJson();
+            builder.OwnsOne(x => x.ShippingAddress).ToJson();
+
+            builder.Property(x => x.Duration)
+                .HasConversion(new DurationConverter(), new DurationComparer());
         });
 
         modelBuilder.SharedTypeEntity<Dictionary<string, object>>("Cat", builder =>
@@ -139,6 +202,7 @@ class DogConfiguration : IEntityTypeConfiguration<Dog>
         //builder.HasMany(x => x.Owners)
         //    .WithMany(x => x.Dogs)
         //    .UsingEntity<DogOwner>();
+        builder.HasQueryFilter(x => !x.Deleted);
     }
 }
 
